@@ -16,7 +16,15 @@ let package = Package(
     .library(name: "SwiftSymbolsUI", targets: ["SwiftSymbolsUI"]),
   ],
   targets: [
-    .target(name: "SwiftSymbols", swiftSettings: swiftSettings),
+    .target(
+      name: "SwiftSymbols",
+      resources: [
+        .copy("Resources/aliases.tsv"),
+        .copy("Resources/categories.tsv"),
+        .copy("Resources/symbols.tsv"),
+      ],
+      swiftSettings: swiftSettings
+    ),
     .target(
       name: "SwiftSymbolsUI",
       dependencies: ["SwiftSymbols"],

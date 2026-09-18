@@ -1,0 +1,144 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least-privilege GITHUB_TOKEN plus the scopes deploy-pages needs to publish.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One Pages publish in flight at a time; never cancel a running deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build DocC site
+    runs-on: macos-26
+    # Every job in this repository is bounded, so a hang fails the job instead of sitting for the
+    # six-hour default. The ceiling is meant to be that job's slowest green run on `main` under its
+    # current definition, rounded up to the next five minutes and then tripled. `Scripts/verify.sh`
+    # holds the rule that every job has one. No green run exists yet; revisit after the first.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      # Names the schemes SwiftPM generated, so a scheme rename shows up here rather than as an
+      # unexplained failure in the per-product builds below.
+      - name: List schemes
+        run: xcodebuild -list
+
+      # Build the catalog module first and publish link metadata for the UI catalog. Keep the
+      # archives separate so the UI build cannot overwrite the archive it resolves against.
+      # The destination matches the runtime pin in ci.yml.
+      - name: Build SwiftSymbols documentation
+        run: |
+          set -o pipefail
+          xcodebuild docbuild \
+            -scheme SwiftSymbols \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.2' \
+            -derivedDataPath .derivedData-catalog \
+            -skipPackagePluginValidation \
+            OTHER_DOCC_FLAGS='--enable-experimental-external-link-support' \
+            | xcbeautify --renderer github-actions
+
+      # Lifted out of derived data entirely, so the path handed to --dependency belongs to nothing
+      # that a later build writes to. This copy is also what the merge step reads: it is the archive
+      # the dependent product actually resolved against.
+      - name: Stage SwiftSymbols archive
+        id: catalog
+        run: |
+          set -euo pipefail
+          found="$(find .derivedData-catalog -type d -name 'SwiftSymbols.doccarchive' | head -1)"
+          if [ -z "$found" ]; then
+            echo "::error::no SwiftSymbols.doccarchive under .derivedData-catalog"
+            exit 1
+          fi
+          mkdir -p .docc-deps
+          cp -R "$found" .docc-deps/SwiftSymbols.doccarchive
+          if [ ! -f .docc-deps/SwiftSymbols.doccarchive/linkable-entities.json ]; then
+            echo "::error::SwiftSymbols.doccarchive carries no link metadata; the flag did not take"
+            exit 1
+          fi
+          echo "archive=$PWD/.docc-deps/SwiftSymbols.doccarchive" >> "$GITHUB_OUTPUT"
+
+      - name: Build SwiftSymbolsUI documentation
+        run: |
+          set -o pipefail
+          xcodebuild docbuild \
+            -scheme SwiftSymbolsUI \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.2' \
+            -derivedDataPath .derivedData \
+            -skipPackagePluginValidation \
+            OTHER_DOCC_FLAGS="--enable-experimental-external-link-support --dependency ${{ steps.catalog.outputs.archive }}" \
+            | xcbeautify --renderer github-actions
+
+      - name: Merge archives
+        run: |
+          set -euo pipefail
+          found="$(find .derivedData -type d -name 'SwiftSymbolsUI.doccarchive' | head -1)"
+          if [ -z "$found" ]; then
+            echo "::error::no SwiftSymbolsUI.doccarchive under .derivedData"
+            exit 1
+          fi
+          "$(xcrun --find docc)" merge .docc-deps/SwiftSymbols.doccarchive "$found" \
+            --synthesized-landing-page-name swift-symbols \
+            --synthesized-landing-page-kind Package \
+            --output-path .merged.doccarchive
+
+      - name: Transform for static hosting
+        run: |
+          set -euo pipefail
+          "$(xcrun --find docc)" process-archive transform-for-static-hosting \
+            .merged.doccarchive \
+            --output-path _site \
+            --hosting-base-path swift-symbols
+
+      # The archive's app shell has no root route under the Pages subpath.
+      - name: Write root redirect
+        run: |
+          set -euo pipefail
+          cat > _site/index.html <<'HTML'
+          <!DOCTYPE html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0; url=documentation/">
+              <link rel="canonical" href="https://kalebcooper.github.io/swift-symbols/documentation/">
+              <title>swift-symbols</title>
+            </head>
+            <body>
+              <p>Redirecting to the <a href="documentation/">swift-symbols documentation</a>.</p>
+            </body>
+          </html>
+          HTML
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

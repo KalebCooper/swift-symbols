@@ -65,6 +65,25 @@ struct CoreGlyphsDataTests {
     }
   }
 
+  @Test("A missing key is reported by name")
+  func aMissingKeyIsReportedByName() throws {
+    let directory = try makeFixture()
+    struct AvailabilityWithoutReleases: Encodable {
+      let symbols: [String: String]
+    }
+    try PropertyListEncoder().encode(
+      AvailabilityWithoutReleases(symbols: ["plus": "2019"])
+    ).write(to: directory.appending(path: "name_availability.plist"))
+    do {
+      _ = try CoreGlyphsData.load(from: directory)
+      Issue.record("expected a decoding failure")
+    } catch GeneratorError.malformed(let message) {
+      #expect(message.contains("year_to_release"))
+    } catch {
+      Issue.record("expected GeneratorError.malformed, got \(error)")
+    }
+  }
+
   @Test("The system directory is where macOS keeps the bundle")
   func theSystemDirectoryIsWhereMacOSKeepsTheBundle() {
     #expect(

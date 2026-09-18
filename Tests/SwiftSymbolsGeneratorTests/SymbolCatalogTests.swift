@@ -88,11 +88,54 @@ struct SymbolCatalogTests {
     #expect(catalog.aliases.first?.targetIdentifier == "plus")
   }
 
-  @Test("The all category is dropped and the latest year is the numeric maximum")
-  func theAllCategoryIsDroppedAndTheLatestYearIsTheNumericMaximum() throws {
+  @Test("An alias whose old name is localized over a canonical stem is dropped")
+  func anAliasWhoseOldNameIsLocalizedOverACanonicalStemIsDropped() throws {
+    var data = makeData()
+    data.aliases["plus.he"] = "plus.circle"
+    let catalog = try SymbolCatalog.build(from: data)
+    #expect(!catalog.aliases.map(\.name).contains("plus.he"))
+  }
+
+  @Test("An alias whose old name is not localized over a canonical stem is kept")
+  func anAliasWhoseOldNameIsNotLocalizedOverACanonicalStemIsKept() throws {
+    var data = makeData()
+    data.aliases["gizmo.ar"] = "plus.circle"
+    let catalog = try SymbolCatalog.build(from: data)
+    let entry = try #require(catalog.aliases.first { $0.name == "gizmo.ar" })
+    #expect(entry.target == "plus.circle")
+  }
+
+  @Test("An alias with a non-localized old name is still dropped when the target is localized")
+  func anAliasWithANonLocalizedOldNameIsStillDroppedWhenTheTargetIsLocalized() throws {
+    var data = makeData()
+    data.aliases["gizmo.ar"] = "plus.ar"
+    let catalog = try SymbolCatalog.build(from: data)
+    #expect(!catalog.aliases.map(\.name).contains("gizmo.ar"))
+  }
+
+  @Test("The all category is dropped")
+  func theAllCategoryIsDropped() throws {
     let catalog = try SymbolCatalog.build(from: makeData())
     #expect(catalog.categories.map(\.key) == ["math"])
-    #expect(catalog.latestYear == "2026")
+  }
+
+  @Test("The SF Symbols year is the newest year among the entries")
+  func theSFSymbolsYearIsTheNewestYearAmongTheEntries() throws {
+    var data = makeData()
+    data.yearToRelease["2027"] = release2026
+    #expect(try SymbolCatalog.build(from: data).sfSymbolsYear == 2026)
+    data.order.removeAll { $0 == "sparkle.new" }
+    #expect(try SymbolCatalog.build(from: data).sfSymbolsYear == 2025)
+  }
+
+  @Test("A catalog without symbols fails loudly")
+  func aCatalogWithoutSymbolsFailsLoudly() {
+    var data = makeData()
+    data.order = []
+    data.aliases = [:]
+    #expect(throws: GeneratorError.unresolved("symbol_order.plist lists no canonical symbol")) {
+      try SymbolCatalog.build(from: data)
+    }
   }
 
   @Test("A name without a year fails loudly")

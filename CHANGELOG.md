@@ -8,6 +8,8 @@ All notable changes are documented here. This project follows
 
 ### Added
 
+- The `SFSymbol` type, the catalog generator, and `Scripts/generate-catalog.sh`, which regenerates
+  the checked-in catalog from the system SF Symbols metadata.
 - SwiftSymbols and SwiftSymbolsUI module foundations, with no public API.
 - Shared test support with the suite time limit, and wiring checks for both products.
 - Documentation catalogs, the verification gate, and CI and docs workflows.

@@ -22,8 +22,21 @@ let package = Package(
       dependencies: ["SwiftSymbols"],
       swiftSettings: swiftSettings
     ),
+    // The generator reads the system SF Symbols metadata and writes the checked-in catalog. No
+    // product declares these targets, so a consumer never builds them.
+    .target(name: "SwiftSymbolsGenerator", swiftSettings: swiftSettings),
+    .executableTarget(
+      name: "swift-symbols-generate",
+      dependencies: ["SwiftSymbolsGenerator"],
+      swiftSettings: swiftSettings
+    ),
     // The shared suite time limit stays out of every consumer product.
     .target(name: "SwiftSymbolsTestSupport", swiftSettings: swiftSettings),
+    .testTarget(
+      name: "SwiftSymbolsGeneratorTests",
+      dependencies: ["SwiftSymbolsGenerator", "SwiftSymbolsTestSupport"],
+      swiftSettings: swiftSettings
+    ),
     .testTarget(
       name: "SwiftSymbolsTests",
       dependencies: ["SwiftSymbols", "SwiftSymbolsTestSupport"],

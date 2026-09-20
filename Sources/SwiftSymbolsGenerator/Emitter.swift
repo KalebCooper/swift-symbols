@@ -340,6 +340,17 @@ package struct Emitter: Sendable {
     return out + "\""
   }
 
+  /// How a doc comment names another member: a symbol link, or a code span for a member that has
+  /// no documentation page.
+  ///
+  /// The documentation compiler leaves out every declaration whose name begins with an
+  /// underscore, which is how a symbol whose name starts with a digit is spelled, so a link to one
+  /// resolves at nothing and fails the documentation build. Such a member keeps its own comment in
+  /// Xcode quick help, so a code span still leads the reader to it.
+  private static func reference(_ identifier: String) -> String {
+    identifier.hasPrefix("_") ? "`\(identifier)`" : "``\(identifier)``"
+  }
+
   /// The opening of `public static var identifier: type {`, broken as swift-format breaks it.
   private static func staticVar(_ identifier: String, type: String) -> String {
     firstFitting([
@@ -368,7 +379,7 @@ package struct Emitter: Sendable {
     let attributes = Dictionary(
       uniqueKeysWithValues: catalog.entries.map { ($0.name, $0.availabilityAttribute) })
     for alias in catalog.aliases {
-      out += Self.docLines("`\(alias.name)`, renamed to ``\(alias.targetIdentifier)``.")
+      out += Self.docLines("`\(alias.name)`, renamed to \(Self.reference(alias.targetIdentifier)).")
       if let attribute = attributes[alias.target] ?? nil { out += "  \(attribute)\n" }
       out += Self.deprecation(renamed: alias.targetIdentifier)
       out += Self.staticVar(alias.identifier, type: "SFSymbol")

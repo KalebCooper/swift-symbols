@@ -234,6 +234,30 @@ struct EmitterTests {
         """))
   }
 
+  /// A member whose name begins with an underscore, which is how a name that starts with a digit
+  /// is spelled, gets no documentation page, so naming it as a link would fail the documentation
+  /// build.
+  @Test("An alias of a symbol spelled with a leading underscore names it in a code span")
+  func anAliasOfASymbolSpelledWithALeadingUnderscoreNamesItInACodeSpan() throws {
+    var data = makeData()
+    data.aliases["old.zero.circle"] = "0.circle"
+    data.availability["old.zero.circle"] = "2019"
+    let aliases = try file(
+      "Sources/SwiftSymbols/Generated/SFSymbol+Aliases.swift", in: makeFiles(data))
+    #expect(
+      aliases.contains(
+        """
+          /// `old.zero.circle`, renamed to `_0Circle`.
+          @available(*, deprecated, renamed: "_0Circle")
+          public static var oldZeroCircle: SFSymbol {
+            ._0Circle
+          }
+
+        """))
+    #expect(aliases.contains("``_0Circle``") == false)
+    #expect(aliases.contains("``plus``"))
+  }
+
   @Test("An alias of a newer symbol carries the symbol's availability")
   func anAliasOfANewerSymbolCarriesTheSymbolsAvailability() throws {
     var data = makeData()

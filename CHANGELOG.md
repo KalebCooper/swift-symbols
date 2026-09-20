@@ -8,29 +8,29 @@ All notable changes are documented here. This project follows
 
 ### Added
 
+- Documentation catalogs for both products, with articles on referencing symbols, working with
+  variants, availability, and displaying symbols in SwiftUI.
 - `SymbolStyle` and the `symbolStyle(_:weight:scale:)` view modifier, which set a symbol's
-  rendering mode and, for `palette(_:)`, the foreground styles of its first three layers. The
-  modifier applies a font weight and an image scale only when given, and a nil for either keeps
-  the value an ancestor set.
-- SwiftUI initializers taking a typed symbol: `Image(_:)`, `Image(_:variants:)`, and
-  `Label(_:symbol:)` for a localized or an already localized title. `SFSymbol.Variant` also
-  answers `symbolVariants`, the SwiftUI value for `symbolVariant(_:)`.
-- `SFSymbol.all`, listing every catalogued symbol once, in the order Apple's SF Symbols app
-  shows them. The list is built on first use.
+  rendering mode and, for a palette, the foreground styles of its first three layers. A weight and
+  a scale are applied only when given, so leaving either out keeps the value an ancestor set.
+- `Image` and `Label` initializers taking an `SFSymbol`, including `Image(_:variants:)`, which
+  resolves the variants through the catalog, and `SFSymbol.Variant.symbolVariants`, the bridge to
+  SwiftUI's `SymbolVariants`.
+- `SFSymbol.all`, listing every catalogued symbol once, in the order Apple's SF Symbols app shows
+  them.
 - Availability on `SFSymbol`: `availability`, reporting the first release of each Apple platform
-  that draws the symbol, the `Availability` and `Version` types it answers with, and
-  `isAvailable`, which compares the running OS against the entry for the platform it is built
-  for. A name the catalog does not list has no availability and is reported available.
-- Variant resolution on `SFSymbol`: `base`, `variants`, `applying(_:)`, `resolving(_:)`,
+  that draws the symbol, the `Availability` and `Version` types it answers with, and `isAvailable`,
+  which compares the running system against the entry for the platform it was built for.
+- Variant resolution through the catalog: `base`, `variants`, `applying(_:)`, `resolving(_:)`,
   `hasVariant(_:)`, and the `circle`, `fill`, `rectangle`, `slash`, and `square` properties.
   Applying a combination the catalog does not draw falls back to the nearest name it does.
-- `SFSymbol(name:)`, which initializes a symbol from a catalogued name, accepts a deprecated name
-  and returns the current one, and fails on a name the catalog does not list. `SFSymbol` also
-  conforms to `Codable`, encoding as its name, and to `CustomStringConvertible` and `Identifiable`.
 - `SFSymbol.Variant`, the option set naming the `circle`, `fill`, `rectangle`, `slash`, and
   `square` suffixes.
-- The `SFSymbol` type, the catalog generator, and `Scripts/generate-catalog.sh`, which regenerates
-  the checked-in catalog from the system SF Symbols metadata.
-- SwiftSymbols and SwiftSymbolsUI module foundations, with no public API.
-- Shared test support with the suite time limit, and wiring checks for both products.
-- Documentation catalogs, the verification gate, and CI and docs workflows.
+- `SFSymbol`, a typed value for every SF Symbol, with a static member per symbol, a deprecated
+  member for every renamed one, `@available` on symbols newer than the platform floor,
+  `init(name:)` for a name that arrives at run time, `init(unchecked:)` for a name the catalog does
+  not list, and `catalogVersion`. `SFSymbol` is `Codable` as its name, `CustomStringConvertible`,
+  `Hashable`, `Identifiable`, and `Sendable`.
+- The catalog generator and `Scripts/generate-catalog.sh`, which regenerates the checked-in catalog
+  from the SF Symbols metadata that ships with macOS. The catalog is generated Swift: the package
+  declares no bundle resource and parses nothing at run time.

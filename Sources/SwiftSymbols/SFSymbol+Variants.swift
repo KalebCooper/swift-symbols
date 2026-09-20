@@ -1,6 +1,13 @@
 extension SFSymbol {
   /// The suffixes SwiftUI models as symbol variants: `circle`, `fill`, `rectangle`, `slash`,
   /// and `square`, in any combination the catalog contains.
+  ///
+  /// Read a symbol's suffixes from ``SFSymbol/variants`` and ask for others with
+  /// ``SFSymbol/applying(_:)`` or ``SFSymbol/resolving(_:)``.
+  ///
+  /// ```swift
+  /// SFSymbol.bellSlashCircleFill.variants    // [.circle, .fill, .slash]
+  /// ```
   public struct Variant: Hashable, OptionSet, Sendable {
     /// The bit pattern of the set.
     public let rawValue: UInt8
@@ -10,15 +17,39 @@ extension SFSymbol {
       self.rawValue = rawValue
     }
 
-    /// The `.circle` suffix.
+    /// The `.circle` suffix, the symbol drawn inside a circle.
+    ///
+    /// ```swift
+    /// SFSymbol.plus.applying(.circle)    // .plusCircle
+    /// ```
     public static let circle = Variant(rawValue: 1 << 0)
-    /// The `.fill` suffix.
+
+    /// The `.fill` suffix, the symbol drawn with its shapes filled.
+    ///
+    /// ```swift
+    /// SFSymbol.plusCircle.applying(.fill)    // .plusCircleFill
+    /// ```
     public static let fill = Variant(rawValue: 1 << 1)
-    /// The `.rectangle` suffix.
+
+    /// The `.rectangle` suffix, the symbol drawn inside a rectangle.
+    ///
+    /// ```swift
+    /// SFSymbol.numbers.applying(.rectangle)    // .numbersRectangle
+    /// ```
     public static let rectangle = Variant(rawValue: 1 << 2)
-    /// The `.slash` suffix.
+
+    /// The `.slash` suffix, the symbol struck through, which reads as the thing turned off.
+    ///
+    /// ```swift
+    /// SFSymbol.wifi.applying(.slash)    // .wifiSlash
+    /// ```
     public static let slash = Variant(rawValue: 1 << 3)
-    /// The `.square` suffix.
+
+    /// The `.square` suffix, the symbol drawn inside a square.
+    ///
+    /// ```swift
+    /// SFSymbol.plus.applying(.square)    // .plusSquare
+    /// ```
     public static let square = Variant(rawValue: 1 << 4)
   }
 }

@@ -10,15 +10,41 @@ extension SFSymbol {
   /// SFSymbol.plus.availability?.macOS    // Version(major: 10, minor: 15)
   /// ```
   public struct Availability: Hashable, Sendable {
-    /// The first iOS and iPadOS release with the symbol.
+    /// The first iOS and iPadOS release that draws the symbol.
+    ///
+    /// ```swift
+    /// SFSymbol.plus.availability?.iOS    // Version(major: 13, minor: 0)
+    /// ```
     public let iOS: Version
-    /// The first macOS release with the symbol.
+
+    /// The first macOS release that draws the symbol.
+    ///
+    /// ```swift
+    /// SFSymbol.plus.availability?.macOS    // Version(major: 10, minor: 15)
+    /// ```
     public let macOS: Version
-    /// The first tvOS release with the symbol.
+
+    /// The first tvOS release that draws the symbol.
+    ///
+    /// ```swift
+    /// SFSymbol.plus.availability?.tvOS    // Version(major: 13, minor: 0)
+    /// ```
     public let tvOS: Version
-    /// The first visionOS release with the symbol.
+
+    /// The first visionOS release that draws the symbol.
+    ///
+    /// A symbol older than visionOS itself reports the first visionOS release.
+    ///
+    /// ```swift
+    /// SFSymbol.plus.availability?.visionOS    // Version(major: 1, minor: 0)
+    /// ```
     public let visionOS: Version
-    /// The first watchOS release with the symbol.
+
+    /// The first watchOS release that draws the symbol.
+    ///
+    /// ```swift
+    /// SFSymbol.plus.availability?.watchOS    // Version(major: 6, minor: 0)
+    /// ```
     public let watchOS: Version
 
     /// The entry for the platform the code is built for.

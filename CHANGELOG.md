@@ -8,6 +8,13 @@ All notable changes are documented here. This project follows
 
 ### Added
 
+- `SymbolStyle` and the `symbolStyle(_:weight:scale:)` view modifier, which set a symbol's
+  rendering mode and, for `palette(_:)`, the foreground styles of its first three layers. The
+  modifier applies a font weight and an image scale only when given, and a nil for either keeps
+  the value an ancestor set.
+- SwiftUI initializers taking a typed symbol: `Image(_:)`, `Image(_:variants:)`, and
+  `Label(_:symbol:)` for a localized or an already localized title. `SFSymbol.Variant` also
+  answers `symbolVariants`, the SwiftUI value for `symbolVariant(_:)`.
 - `SFSymbol.all`, listing every catalogued symbol once, in the order Apple's SF Symbols app
   shows them. The list is built on first use.
 - Availability on `SFSymbol`: `availability`, reporting the first release of each Apple platform

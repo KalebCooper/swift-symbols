@@ -7,7 +7,7 @@ extension SFSymbol {
     public let sfSymbolsYear: Int
 
     /// Creates a version from its build and release year.
-    public init(macOSBuild: String, sfSymbolsYear: Int) {
+    init(macOSBuild: String, sfSymbolsYear: Int) {
       self.macOSBuild = macOSBuild
       self.sfSymbolsYear = sfSymbolsYear
     }

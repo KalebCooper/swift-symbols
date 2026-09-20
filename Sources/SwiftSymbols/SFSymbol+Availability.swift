@@ -37,6 +37,8 @@ extension SFSymbol {
       return visionOS
       #elseif os(watchOS)
       return watchOS
+      #else
+      #error("This platform has no entry in Availability; add one and widen the release table.")
       #endif
     }
   }

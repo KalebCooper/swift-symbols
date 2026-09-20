@@ -39,16 +39,15 @@ do {
   let build = try option("--build") ?? systemBuild()
   let data = try CoreGlyphsData.load(from: bundle)
   let catalog = try SymbolCatalog.build(from: data)
-  let files = Emitter(build: build, catalog: catalog).files()
+  let files = try Emitter(build: build, catalog: catalog).files()
   let root = URL(filePath: output, directoryHint: .isDirectory)
   // A stale file from an earlier release would otherwise survive next to the fresh ones.
-  for directory in ["Sources/SwiftSymbols/Generated", "Sources/SwiftSymbols/Resources"] {
-    let url = root.appending(path: directory, directoryHint: .isDirectory)
-    if FileManager.default.fileExists(atPath: url.path()) {
-      try FileManager.default.removeItem(at: url)
-    }
-    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+  let generated = root.appending(
+    path: "Sources/SwiftSymbols/Generated", directoryHint: .isDirectory)
+  if FileManager.default.fileExists(atPath: generated.path()) {
+    try FileManager.default.removeItem(at: generated)
   }
+  try FileManager.default.createDirectory(at: generated, withIntermediateDirectories: true)
   for file in files {
     try Data(file.contents.utf8).write(to: root.appending(path: file.path))
   }

@@ -48,25 +48,80 @@ struct EmitterTests {
     return data
   }
 
+  /// A fixture with more names than one literal holds, so a column has to be split.
+  private func wideData() -> CoreGlyphsData {
+    var data = CoreGlyphsData(
+      aliases: [:],
+      availability: [:],
+      categories: [],
+      fillCounterparts: [:],
+      order: [],
+      restrictions: [:],
+      searchTerms: [:],
+      symbolCategories: [:],
+      yearToRelease: ["2019": release2019])
+    for index in 0..<130 {
+      let name = "sym\(String(format: "%03d", index))"
+      data.order.append(name)
+      data.availability[name] = "2019"
+    }
+    return data
+  }
+
   private func makeFiles(_ data: CoreGlyphsData? = nil) throws -> [GeneratedFile] {
-    Emitter(build: "26A428", catalog: try SymbolCatalog.build(from: data ?? makeData())).files()
+    try Emitter(build: "26A428", catalog: try SymbolCatalog.build(from: data ?? makeData())).files()
   }
 
   private func file(_ path: String, in files: [GeneratedFile]) throws -> String {
     try #require(files.first { $0.path == path }).contents
   }
 
+  /// Every table file's text, so a column is found wherever the emitter grouped it.
+  private func tables(_ files: [GeneratedFile]) -> String {
+    files.filter { $0.path.contains("SymbolTable") }.map(\.contents).joined()
+  }
+
+  /// The elements of one literal, or nil when `source` declares no such literal.
+  private func literal(_ name: String, _ type: String, in source: String) -> [String]? {
+    guard let opening = source.range(of: "static let \(name): [\(type)] = [\n") else { return nil }
+    guard let closing = source.range(of: "\n  ]\n", range: opening.upperBound..<source.endIndex)
+    else { return nil }
+    return source[opening.upperBound..<closing.lowerBound]
+      .split(separator: ",")
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+  }
+
+  /// The elements of a column, whether it is one literal or a chunked one, in composed order.
+  private func column(_ name: String, _ type: String, in source: String) -> [String] {
+    if let single = literal(name, type, in: source) { return single }
+    var elements: [String] = []
+    var chunk = 0
+    while let piece = literal("\(name)\(chunk)", type, in: source) {
+      elements += piece
+      chunk += 1
+    }
+    return elements
+  }
+
   @Test("Every file starts with the header")
   func everyFileStartsWithTheHeader() throws {
     let files = try makeFiles()
-    #expect(files.count == 10)
+    #expect(files.count == 11)
     for file in files {
-      let isSwift = file.path.hasSuffix(".swift")
-      let prefix = isSwift ? Emitter.headerPrefix : Emitter.resourceHeaderPrefix
-      #expect(file.contents.hasPrefix(prefix), "\(file.path)")
+      #expect(file.contents.hasPrefix(Emitter.headerPrefix), "\(file.path)")
       #expect(file.contents.contains("SF Symbols 2026"), "\(file.path)")
       #expect(file.contents.contains("macOS build 26A428"), "\(file.path)")
       #expect(file.contents.contains("Do not edit."), "\(file.path)")
+    }
+  }
+
+  @Test("Every file is generated Swift under one directory")
+  func everyFileIsGeneratedSwiftUnderOneDirectory() throws {
+    for file in try makeFiles() {
+      #expect(file.path.hasPrefix("Sources/SwiftSymbols/Generated/"), "\(file.path)")
+      #expect(file.path.hasSuffix(".swift"), "\(file.path)")
+      #expect(file.path.contains("Category") == false, "\(file.path)")
     }
   }
 
@@ -119,6 +174,23 @@ struct EmitterTests {
     #expect(
       r.contains("public static var `repeat`: SFSymbol {\n    SFSymbol(unchecked: \"repeat\")\n  }")
     )
+  }
+
+  @Test("A symbol with no categories or search terms documents only its name and availability")
+  func aSymbolWithNoCategoriesOrSearchTermsDocumentsOnlyItsNameAndAvailability() throws {
+    let r = try file(
+      "Sources/SwiftSymbols/Generated/SFSymbol+Symbols-r.swift", in: try makeFiles())
+    #expect(
+      r.contains(
+        """
+          /// `repeat`
+          ///
+          /// Available since iOS 13.0, macOS 11.0, tvOS 13.0, watchOS 6.0, visionOS 1.0.
+          public static var `repeat`: SFSymbol {
+
+        """))
+    #expect(r.contains("Categories:") == false)
+    #expect(r.contains("Search terms:") == false)
   }
 
   @Test("Availability comes from the release table, not from literals")
@@ -182,22 +254,10 @@ struct EmitterTests {
         """))
   }
 
-  @Test("Categories and the catalog version are emitted")
-  func categoriesAndTheCatalogVersionAreEmitted() throws {
-    let files = try makeFiles()
-    let categories = try file(
-      "Sources/SwiftSymbols/Generated/SFSymbol.Category+All.swift", in: files)
-    #expect(
-      categories.contains(
-        """
-          /// The `math` category. Apple's icon for it is `x.squareroot`.
-          public static var math: SFSymbol.Category {
-            SFSymbol.Category(key: "math")
-          }
-
-        """))
-    #expect(categories.contains("key: \"all\"") == false)
-    let version = try file("Sources/SwiftSymbols/Generated/CatalogVersion.swift", in: files)
+  @Test("The catalog version is emitted")
+  func theCatalogVersionIsEmitted() throws {
+    let version = try file(
+      "Sources/SwiftSymbols/Generated/CatalogVersion.swift", in: makeFiles())
     #expect(version.contains("CatalogVersion(macOSBuild: \"26A428\", sfSymbolsYear: 2026)"))
   }
 
@@ -212,34 +272,121 @@ struct EmitterTests {
     #expect(files.allSatisfy { $0.contents.contains("SF Symbols 2025,") })
   }
 
-  @Test("Resource rows are tab separated with escaped fields")
-  func resourceRowsAreTabSeparatedWithEscapedFields() throws {
+  @Test("The table is declared once, as package rather than public")
+  func theTableIsDeclaredOnceAsPackageRatherThanPublic() throws {
     let files = try makeFiles()
-    let symbols = try file("Sources/SwiftSymbols/Resources/symbols.tsv", in: files)
-    let lines = symbols.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    let declaration = try file(
+      "Sources/SwiftSymbols/Generated/SymbolTable.swift", in: files)
+    #expect(declaration.contains("package enum SymbolTable {}"))
+    #expect(tables(files).contains("public ") == false)
+    for file in files where file.path.contains("SymbolTable+") {
+      #expect(file.contents.contains("\nextension SymbolTable {\n"), "\(file.path)")
+    }
+  }
+
+  @Test("Every per-symbol column has one element per name")
+  func everyPerSymbolColumnHasOneElementPerName() throws {
+    let source = tables(try makeFiles())
+    let names = column("names", "String", in: source)
     #expect(
-      lines[0]
-        == "# Generated by swift-symbols-generate from SF Symbols 2026, macOS build 26A428. Do not edit."
-    )
-    #expect(lines[1] == "0.circle\t2019\t13.0\t11.0\t13.0\t6.0\t1.0\t\t\t\t\t0\tcircle")
+      names == ["\"0.circle\"", "\"plus\"", "\"plus.circle\"", "\"repeat\"", "\"sparkle.new\""])
+    for (name, type) in [
+      ("baseIndex", "UInt16"), ("order", "UInt16"), ("variantBits", "UInt8"),
+      ("variantOrder", "UInt16"), ("yearIndex", "UInt8"),
+    ] {
+      #expect(column(name, type, in: source).count == names.count, "\(name)")
+    }
+  }
+
+  @Test("The order and variant columns are permutations of the rows")
+  func theOrderAndVariantColumnsArePermutationsOfTheRows() throws {
+    let source = tables(try makeFiles())
+    let rows = column("names", "String", in: source).count
+    for (name, type) in [("order", "UInt16"), ("variantOrder", "UInt16")] {
+      let values = column(name, type, in: source).compactMap(Int.init)
+      #expect(values.sorted() == Array(0..<rows), "\(name)")
+    }
+    // The canonical order is the fixture's, and the sorted order puts `0.circle` first.
+    #expect(column("order", "UInt16", in: source) == ["0", "1", "2", "3", "4"])
+  }
+
+  @Test("Every index column points at a row that exists")
+  func everyIndexColumnPointsAtARowThatExists() throws {
+    let source = tables(try makeFiles())
+    let rows = column("names", "String", in: source).count
+    let orphans = column("orphanBases", "String", in: source).count
+    for value in column("baseIndex", "UInt16", in: source).compactMap(Int.init) {
+      #expect(value < rows + orphans)
+    }
+    for value in column("aliasTargets", "UInt16", in: source).compactMap(Int.init) {
+      #expect(value < rows)
+    }
+    #expect(column("aliasNames", "String", in: source) == ["\"old.plus\""])
+    #expect(column("aliasTargets", "UInt16", in: source) == ["1"])
+  }
+
+  @Test("A release is ten numbers and the variant bits describe the suffixes")
+  func aReleaseIsTenNumbersAndTheVariantBitsDescribeTheSuffixes() throws {
+    let source = tables(try makeFiles())
+    let releases = column("releases", "UInt8", in: source)
+    let years = Set(column("yearIndex", "UInt8", in: source))
+    #expect(years == ["0", "1"])
+    #expect(releases.count == 20)
+    // Years ascend, and a row lists iOS, macOS, tvOS, visionOS, then watchOS.
+    #expect(Array(releases.prefix(10)) == ["13", "0", "11", "0", "13", "0", "1", "0", "6", "0"])
+    // `0.circle` and `plus.circle` are the names with a suffix, and `circle` is bit one.
+    #expect(column("variantBits", "UInt8", in: source) == ["1", "0", "1", "0", "0"])
+  }
+
+  @Test("A base that is not a catalogued name becomes an orphan row")
+  func aBaseThatIsNotACataloguedNameBecomesAnOrphanRow() throws {
+    var data = makeData()
+    data.order.append("bell.slash")
+    data.availability["bell.slash"] = "2019"
+    let source = tables(try makeFiles(data))
+    let rows = column("names", "String", in: source).count
+    // `0` is the base of `0.circle` and `bell` of `bell.slash`; neither is a name of its own.
+    #expect(column("orphanBases", "String", in: source) == ["\"0\"", "\"bell\""])
+    // The two orphans sit past the last name, in the order `orphanBases` lists them.
     #expect(
-      lines[2] == "plus\t2019\t13.0\t11.0\t13.0\t6.0\t1.0\tmath\tadd,new improved\t\t\tplus\t")
+      Array(column("baseIndex", "UInt16", in: source).prefix(2)) == ["\(rows)", "\(rows + 1)"])
+  }
+
+  @Test("A name with a quote or a backslash keeps its escapes")
+  func aNameWithAQuoteOrABackslashKeepsItsEscapes() throws {
+    var data = makeData()
+    for name in [#"quote"name"#, #"back\slash"#] {
+      data.order.append(name)
+      data.availability[name] = "2019"
+    }
+    let source = tables(try makeFiles(data))
+    let names = column("names", "String", in: source)
+    #expect(names.contains(#""back\\slash""#))
+    #expect(names.contains(#""quote\"name""#))
+  }
+
+  @Test("A column longer than one literal is split and composed in order")
+  func aColumnLongerThanOneLiteralIsSplitAndComposedInOrder() throws {
+    let names = try file(
+      "Sources/SwiftSymbols/Generated/SymbolTable+Names.swift", in: makeFiles(wideData()))
+    #expect(literal("names", "String", in: names) == nil)
+    #expect(literal("names0", "String", in: names)?.count == 128)
+    #expect(literal("names1", "String", in: names)?.count == 2)
+    #expect(literal("names1", "String", in: names) == ["\"sym128\"", "\"sym129\""])
+    #expect(column("names", "String", in: names).count == 130)
+    #expect(column("names", "String", in: names).first == "\"sym000\"")
     #expect(
-      lines[3]
-        == "plus.circle\t2019\t13.0\t11.0\t13.0\t6.0\t1.0\t\t\t\tplus.circle.fill\tplus\tcircle")
-    #expect(
-      lines[5]
-        == "sparkle.new\t2026\t27.0\t27.0\t27.0\t27.0\t27.0\t\t\tApple's \"new\" things only.\t\tsparkle.new\t"
-    )
-    #expect(lines.last == "")
-    #expect(
-      lines.dropFirst().dropLast().allSatisfy {
-        $0.split(separator: "\t", omittingEmptySubsequences: false).count == 13
-      })
-    let aliases = try file("Sources/SwiftSymbols/Resources/aliases.tsv", in: files)
-    #expect(aliases.split(separator: "\n")[1] == "old.plus\tplus")
-    let categories = try file("Sources/SwiftSymbols/Resources/categories.tsv", in: files)
-    #expect(categories.split(separator: "\n").dropFirst() == ["math\tx.squareroot"])
+      names.contains(
+        """
+          package static let names: [String] = {
+            var all: [String] = []
+            all.reserveCapacity(130)
+            all += names0
+            all += names1
+            return all
+          }()
+
+        """))
   }
 
   @Test("Tabs and newlines inside a field become spaces")
@@ -247,14 +394,10 @@ struct EmitterTests {
     var data = makeData()
     data.restrictions["plus"] = "Line one.\nLine\ttwo."
     data.searchTerms["plus"] = ["a\tb", "c\nd"]
-    let files = try makeFiles(data)
-    let symbols = try file("Sources/SwiftSymbols/Resources/symbols.tsv", in: files)
-    let plus = try #require(symbols.split(separator: "\n").first { $0.hasPrefix("plus\t") })
-    let fields = plus.split(separator: "\t", omittingEmptySubsequences: false)
-    #expect(fields[8] == "a b,c d")
-    #expect(fields[9] == "Line one. Line two.")
-    let p = try file("Sources/SwiftSymbols/Generated/SFSymbol+Symbols-p.swift", in: files)
+    let p = try file(
+      "Sources/SwiftSymbols/Generated/SFSymbol+Symbols-p.swift", in: makeFiles(data))
     #expect(p.contains("  /// Restriction: Line one. Line two.\n"))
+    #expect(p.contains("  /// Categories: math. Search terms: a b, c d.\n"))
   }
 
   @Test("Long names break where swift-format breaks them")
@@ -315,7 +458,7 @@ struct EmitterTests {
   func swiftOutputKeepsSwiftFormatsLayout() throws {
     var data = longNameData()
     data.searchTerms["plus"] = Array(repeating: "addition", count: 30)
-    for file in try makeFiles(data) where file.path.hasSuffix(".swift") {
+    for file in try makeFiles(data) + makeFiles(wideData()) {
       #expect(file.contents.hasSuffix("}\n"), "\(file.path)")
       #expect(file.contents.contains("\n\n\n") == false, "\(file.path)")
       #expect(file.contents.contains("\t") == false, "\(file.path)")
@@ -332,10 +475,10 @@ struct EmitterTests {
   @Test("Output is deterministic")
   func outputIsDeterministic() throws {
     let catalog = try SymbolCatalog.build(from: makeData())
-    let first = Emitter(build: "26A428", catalog: catalog).files()
-    let second = Emitter(build: "26A428", catalog: catalog).files()
+    let first = try Emitter(build: "26A428", catalog: catalog).files()
+    let second = try Emitter(build: "26A428", catalog: catalog).files()
     let rebuilt = Emitter(build: "26A428", catalog: try SymbolCatalog.build(from: makeData()))
     #expect(first == second)
-    #expect(first == rebuilt.files())
+    #expect(first == (try rebuilt.files()))
   }
 }

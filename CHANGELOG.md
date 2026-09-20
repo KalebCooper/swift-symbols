@@ -6,6 +6,8 @@ All notable changes are documented here. This project follows
 
 ## Unreleased
 
+## 0.1.0 - 2026-09-20
+
 ### Added
 
 - Documentation catalogs for both products, with articles on referencing symbols, working with

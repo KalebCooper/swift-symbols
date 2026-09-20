@@ -10,7 +10,7 @@ while your app runs.
 
 ## Status
 
-0.1.0 in preparation, unreleased. The symbol catalog, the variant model, availability, and the
+0.1.0 is the current release. The symbol catalog, the variant model, availability, and the
 SwiftUI image, label, and style surface are in place. Custom symbols and typed symbol-effect
 modifiers are planned for a later release.
 
@@ -69,9 +69,21 @@ SF Symbols exist only on Apple platforms, so the package targets nothing else.
 
 ## Installation
 
-No release has been published. For local development, add this checkout as a local Swift package
-and select either product. The repository location is
-[KalebCooper/swift-symbols](https://github.com/KalebCooper/swift-symbols).
+Add the package to the dependencies in your `Package.swift`:
+
+```swift
+.package(url: "https://github.com/KalebCooper/swift-symbols.git", from: "0.1.0")
+```
+
+Then add the product you need to a target:
+
+```swift
+.product(name: "SwiftSymbols", package: "swift-symbols")
+.product(name: "SwiftSymbolsUI", package: "swift-symbols")
+```
+
+In Xcode, choose File > Add Package Dependencies and enter
+`https://github.com/KalebCooper/swift-symbols.git`.
 
 ## License
 

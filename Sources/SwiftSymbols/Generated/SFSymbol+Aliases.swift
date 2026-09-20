@@ -2235,42 +2235,42 @@ extension SFSymbol {
   public static var gobackward: SFSymbol {
     .arrowTriangleheadCounterclockwise
   }
-  /// `gobackward.10`, renamed to ``_10ArrowTriangleheadCounterclockwise``.
+  /// `gobackward.10`, renamed to `_10ArrowTriangleheadCounterclockwise`.
   @available(*, deprecated, renamed: "_10ArrowTriangleheadCounterclockwise")
   public static var gobackward10: SFSymbol {
     ._10ArrowTriangleheadCounterclockwise
   }
-  /// `gobackward.15`, renamed to ``_15ArrowTriangleheadCounterclockwise``.
+  /// `gobackward.15`, renamed to `_15ArrowTriangleheadCounterclockwise`.
   @available(*, deprecated, renamed: "_15ArrowTriangleheadCounterclockwise")
   public static var gobackward15: SFSymbol {
     ._15ArrowTriangleheadCounterclockwise
   }
-  /// `gobackward.30`, renamed to ``_30ArrowTriangleheadCounterclockwise``.
+  /// `gobackward.30`, renamed to `_30ArrowTriangleheadCounterclockwise`.
   @available(*, deprecated, renamed: "_30ArrowTriangleheadCounterclockwise")
   public static var gobackward30: SFSymbol {
     ._30ArrowTriangleheadCounterclockwise
   }
-  /// `gobackward.45`, renamed to ``_45ArrowTriangleheadCounterclockwise``.
+  /// `gobackward.45`, renamed to `_45ArrowTriangleheadCounterclockwise`.
   @available(*, deprecated, renamed: "_45ArrowTriangleheadCounterclockwise")
   public static var gobackward45: SFSymbol {
     ._45ArrowTriangleheadCounterclockwise
   }
-  /// `gobackward.5`, renamed to ``_5ArrowTriangleheadCounterclockwise``.
+  /// `gobackward.5`, renamed to `_5ArrowTriangleheadCounterclockwise`.
   @available(*, deprecated, renamed: "_5ArrowTriangleheadCounterclockwise")
   public static var gobackward5: SFSymbol {
     ._5ArrowTriangleheadCounterclockwise
   }
-  /// `gobackward.60`, renamed to ``_60ArrowTriangleheadCounterclockwise``.
+  /// `gobackward.60`, renamed to `_60ArrowTriangleheadCounterclockwise`.
   @available(*, deprecated, renamed: "_60ArrowTriangleheadCounterclockwise")
   public static var gobackward60: SFSymbol {
     ._60ArrowTriangleheadCounterclockwise
   }
-  /// `gobackward.75`, renamed to ``_75ArrowTriangleheadCounterclockwise``.
+  /// `gobackward.75`, renamed to `_75ArrowTriangleheadCounterclockwise`.
   @available(*, deprecated, renamed: "_75ArrowTriangleheadCounterclockwise")
   public static var gobackward75: SFSymbol {
     ._75ArrowTriangleheadCounterclockwise
   }
-  /// `gobackward.90`, renamed to ``_90ArrowTriangleheadCounterclockwise``.
+  /// `gobackward.90`, renamed to `_90ArrowTriangleheadCounterclockwise`.
   @available(*, deprecated, renamed: "_90ArrowTriangleheadCounterclockwise")
   public static var gobackward90: SFSymbol {
     ._90ArrowTriangleheadCounterclockwise
@@ -2285,42 +2285,42 @@ extension SFSymbol {
   public static var goforward: SFSymbol {
     .arrowTriangleheadClockwise
   }
-  /// `goforward.10`, renamed to ``_10ArrowTriangleheadClockwise``.
+  /// `goforward.10`, renamed to `_10ArrowTriangleheadClockwise`.
   @available(*, deprecated, renamed: "_10ArrowTriangleheadClockwise")
   public static var goforward10: SFSymbol {
     ._10ArrowTriangleheadClockwise
   }
-  /// `goforward.15`, renamed to ``_15ArrowTriangleheadClockwise``.
+  /// `goforward.15`, renamed to `_15ArrowTriangleheadClockwise`.
   @available(*, deprecated, renamed: "_15ArrowTriangleheadClockwise")
   public static var goforward15: SFSymbol {
     ._15ArrowTriangleheadClockwise
   }
-  /// `goforward.30`, renamed to ``_30ArrowTriangleheadClockwise``.
+  /// `goforward.30`, renamed to `_30ArrowTriangleheadClockwise`.
   @available(*, deprecated, renamed: "_30ArrowTriangleheadClockwise")
   public static var goforward30: SFSymbol {
     ._30ArrowTriangleheadClockwise
   }
-  /// `goforward.45`, renamed to ``_45ArrowTriangleheadClockwise``.
+  /// `goforward.45`, renamed to `_45ArrowTriangleheadClockwise`.
   @available(*, deprecated, renamed: "_45ArrowTriangleheadClockwise")
   public static var goforward45: SFSymbol {
     ._45ArrowTriangleheadClockwise
   }
-  /// `goforward.5`, renamed to ``_5ArrowTriangleheadClockwise``.
+  /// `goforward.5`, renamed to `_5ArrowTriangleheadClockwise`.
   @available(*, deprecated, renamed: "_5ArrowTriangleheadClockwise")
   public static var goforward5: SFSymbol {
     ._5ArrowTriangleheadClockwise
   }
-  /// `goforward.60`, renamed to ``_60ArrowTriangleheadClockwise``.
+  /// `goforward.60`, renamed to `_60ArrowTriangleheadClockwise`.
   @available(*, deprecated, renamed: "_60ArrowTriangleheadClockwise")
   public static var goforward60: SFSymbol {
     ._60ArrowTriangleheadClockwise
   }
-  /// `goforward.75`, renamed to ``_75ArrowTriangleheadClockwise``.
+  /// `goforward.75`, renamed to `_75ArrowTriangleheadClockwise`.
   @available(*, deprecated, renamed: "_75ArrowTriangleheadClockwise")
   public static var goforward75: SFSymbol {
     ._75ArrowTriangleheadClockwise
   }
-  /// `goforward.90`, renamed to ``_90ArrowTriangleheadClockwise``.
+  /// `goforward.90`, renamed to `_90ArrowTriangleheadClockwise`.
   @available(*, deprecated, renamed: "_90ArrowTriangleheadClockwise")
   public static var goforward90: SFSymbol {
     ._90ArrowTriangleheadClockwise

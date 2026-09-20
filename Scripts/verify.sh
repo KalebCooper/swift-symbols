@@ -15,16 +15,19 @@ set -u
 ROOT="${VERIFY_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 FAILURES=0
 
-# Every check here is exercised by `--self-test`. `check_format` and `check_nothing_local_tracked`
-# are not: the first needs a toolchain and the second a git checkout, and neither has a planted
-# violation that a scratch tree can hold.
+# Every check here is exercised by `--self-test`. `check_format`, `check_catalog_fresh`, and
+# `check_nothing_local_tracked` are not: the first two need a toolchain (the second also this
+# machine's CoreGlyphs bundle) and the third a git checkout, and none has a planted violation that a
+# scratch tree can hold.
 SELF_TESTABLE=(
   check_banned_imports
   check_coordinates
   check_core_import_boundary
   check_em_dash
   check_force_ops
+  check_generated_header
   check_job_timeouts
+  check_no_resources
   check_suite_time_limit
   check_swift_testing_only
   check_test_jargon
@@ -79,6 +82,100 @@ check_force_ops() {
   if [ -z "$hits" ]; then pass "$name"; else fail "$name"; printf '%s\n' "$hits"; fi
 }
 
+# Regeneration compiles the generator with swiftc, so the run is bounded: killed at 300 s of wall
+# time or 8 GB of resident memory summed over the run's process tree, whichever comes first.
+WATCHDOG_SECONDS=300
+WATCHDOG_RSS_KB=$((8 * 1024 * 1024))
+
+# Every process in the run's tree, the root last, read from the same ppid map the resident-memory
+# sum walks. The run is a shell, then the compiler driver, then the frontend, so signalling the
+# direct children alone orphans the frontend, which is the process holding the memory.
+tree_of() {
+  ps -axo pid=,ppid= | awk -v root="$1" '
+    { ppid[$1] = $2; pids[n++] = $1 }
+    END {
+      for (i = 0; i < n; i++) {
+        q = pids[i]
+        hops = 0
+        while (q != "" && q != 0 && q != root && hops++ < 64) q = ppid[q]
+        if (q == root && pids[i] != root) print pids[i]
+      }
+      print root
+    }'
+}
+
+# Kills a whole process tree, descendants before the root, so nothing survives the kill the
+# watchdog reports.
+kill_tree() {
+  local process
+  for process in $(tree_of "$1"); do kill -KILL "$process" 2>/dev/null || true; done
+}
+
+# Runs a command with output to `$1`, under the limits above. Prints the reason on stderr and
+# returns 124 when it kills the run; otherwise returns the command's own status.
+run_watched() {
+  local log="$1" pid started rss status
+  shift
+  "$@" >"$log" 2>&1 &
+  pid=$!
+  started=$SECONDS
+  while kill -0 "$pid" 2>/dev/null; do
+    rss=$(ps -axo pid=,ppid=,rss= | awk -v root="$pid" '
+      { ppid[$1] = $2; kb[$1] = $3 }
+      END {
+        for (p in ppid) {
+          q = p
+          while (q != "" && q != 0 && q != root) q = ppid[q]
+          if (q == root) sum += kb[p]
+        }
+        print sum + 0
+      }')
+    if [ "$rss" -gt "$WATCHDOG_RSS_KB" ]; then
+      kill_tree "$pid"; wait "$pid" 2>/dev/null
+      printf 'killed: resident memory %d KB over the %d KB limit\n' "$rss" "$WATCHDOG_RSS_KB" >&2
+      return 124
+    fi
+    if [ $((SECONDS - started)) -ge "$WATCHDOG_SECONDS" ]; then
+      kill_tree "$pid"; wait "$pid" 2>/dev/null
+      printf 'killed: still running after %d s\n' "$WATCHDOG_SECONDS" >&2
+      return 124
+    fi
+    sleep 0.5
+  done
+  wait "$pid"
+}
+
+# Regenerates the catalog into a scratch directory and diffs it against the checked-in files. Warns
+# rather than verifying when this machine's build is not the one the catalog was generated on, since
+# another build's CoreGlyphs bundle legitimately yields different files; a warning does not fail the
+# gate, so the local pre-commit run is where freshness is actually enforced. Needs the toolchain and
+# this machine's bundle, so `--self-test` cannot exercise it, like `check_format`.
+check_catalog_fresh() {
+  local name="generated catalog matches a fresh regeneration"
+  local recorded local_build tmp status
+  recorded=$(sed -n 's/.*macOSBuild: "\([^"]*\)".*/\1/p' "$ROOT/Sources/SwiftSymbols/Generated/CatalogVersion.swift" 2>/dev/null | head -1)
+  if [ -z "$recorded" ]; then fail "$name (no macOS build recorded in Generated/CatalogVersion.swift)"; return; fi
+  if ! command -v sw_vers >/dev/null 2>&1 || ! command -v xcrun >/dev/null 2>&1; then
+    warn "$name (not verified: sw_vers or xcrun not found)"; return
+  fi
+  local_build=$(sw_vers -buildVersion)
+  if [ "$local_build" != "$recorded" ]; then
+    warn "$name (not verified: this machine is build $local_build, the catalog is build $recorded)"; return
+  fi
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/verify-catalog.XXXXXX")
+  status=0
+  run_watched "$tmp/generate.log" bash "$ROOT/Scripts/generate-catalog.sh" --output "$tmp/out" || status=$?
+  if [ "$status" -ne 0 ]; then
+    fail "$name (regeneration exited $status)"; tail -20 "$tmp/generate.log"; rm -rf "$tmp"; return
+  fi
+  if diff -r "$ROOT/Sources/SwiftSymbols/Generated" "$tmp/out/Sources/SwiftSymbols/Generated" >"$tmp/diff.txt" 2>&1; then
+    pass "$name"
+  else
+    fail "$name"; head -40 "$tmp/diff.txt"
+  fi
+  rm -rf "$tmp"
+}
+
 check_format() {
   local name="swift format lint --strict reports zero findings"
   if ! command -v swift >/dev/null 2>&1; then fail "$name (swift toolchain not found)"; return; fi
@@ -88,6 +185,35 @@ check_format() {
     fail "$name"
     (cd "$ROOT" && swift format lint --strict --recursive Sources Tests 2>&1 | head -40)
   fi
+}
+
+# Every generated file opens with the generator's own header, so a hand-written file cannot hide in
+# `Generated/` and a hand edit that eats the header shows. The expected lines are read from the
+# emitter, so a header change there cannot leave this check comparing against a stale copy.
+check_generated_header() {
+  local name="every file in Sources/SwiftSymbols/Generated is Swift and starts with the generator header"
+  local emitter="$ROOT/Sources/SwiftSymbolsGenerator/Emitter.swift"
+  local first second files file others bad=""
+  first=$(sed -n 's/.*headerPrefix = "\(.*\)"$/\1/p' "$emitter" 2>/dev/null | head -1)
+  second=$(sed -n 's/^ *\(\/\/ Regenerate with.*\)$/\1/p' "$emitter" 2>/dev/null | head -1)
+  second="${second%%\`*}"
+  if [ -z "$first" ] || [ -z "$second" ]; then fail "$name (the emitter's header lines were not found; the check has lost its source)"; return; fi
+  files=$(swift_files Sources/SwiftSymbols/Generated)
+  if [ -z "$files" ]; then fail "$name (no Swift file under Generated; the check has lost its subject)"; return; fi
+  while IFS= read -r file; do
+    if [ "$(sed -n 1p "$file" | cut -c1-${#first})" != "$first" ] || [ "$(sed -n 2p "$file" | cut -c1-${#second})" != "$second" ]; then
+      bad="$bad$file: does not start with the generator header
+"
+    fi
+  done <<<"$files"
+  others=$(find "$ROOT/Sources/SwiftSymbols/Generated" -type f ! -name '*.swift' 2>/dev/null | sort)
+  if [ -n "$others" ]; then
+    while IFS= read -r file; do
+      bad="$bad$file: is not Swift, and only Swift is generated
+"
+    done <<<"$others"
+  fi
+  if [ -z "$bad" ]; then pass "$name"; else fail "$name"; printf '%s' "$bad"; fi
 }
 
 # Every job is bounded so a hang fails the job instead of sitting for GitHub's six-hour default.
@@ -115,6 +241,21 @@ check_job_timeouts() {
     pass "$name"
   else
     fail "$name"; printf '%s\n' "$report"
+  fi
+}
+
+# The catalog is compiled Swift, so the package ships no bundle resources and reads none.
+check_no_resources() {
+  local name="no resources: in Package.swift, no Resources directory under Sources, and no Bundle.module read"
+  local hits dirs reads
+  if [ ! -f "$ROOT/Package.swift" ]; then fail "$name (no Package.swift; the check has lost its subject)"; return; fi
+  hits=$(grep -nH 'resources:' "$ROOT/Package.swift" || true)
+  dirs=$(find "$ROOT/Sources" -type d -name Resources 2>/dev/null || true)
+  reads=$(code_lines $(swift_files Sources) | grep -F 'Bundle.module' || true)
+  if [ -z "$hits" ] && [ -z "$dirs" ] && [ -z "$reads" ]; then
+    pass "$name"
+  else
+    fail "$name"; printf '%s\n%s\n%s\n' "$hits" "$dirs" "$reads" | sed '/^$/d'
   fi
 }
 
@@ -244,8 +385,12 @@ plant_second_violation() {
       printf '@preconcurrency import Dispatch\n' > "$d/Sources/SwiftSymbolsUI/Leak.swift" ;;
     check_core_import_boundary)
       printf '@_exported public import SwiftSymbolsUI\n' > "$d/Sources/SwiftSymbols/Leak.swift" ;;
+    check_generated_header)
+      printf '// Generated by hand\n// Regenerate with nothing\n\nextension SFSymbol {}\n' > "$d/Sources/SwiftSymbols/Generated/HandWritten.swift" ;;
     check_job_timeouts)
       printf 'name: Nested\n\non:\n  push:\n\njobs:\n  nested:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        timeout-minutes: 5\n' > "$d/.github/workflows/nested.yml" ;;
+    check_no_resources)
+      mkdir -p "$d/Sources/SwiftSymbols/Resources" && printf 'a\tb\n' > "$d/Sources/SwiftSymbols/Resources/symbols.tsv" ;;
     check_suite_time_limit)
       printf 'import SwiftSymbolsTestSupport\nimport Testing\n\n@Suite(.timeLimit(.minutes(suiteTimeLimitMinutes))) struct OuterTests {\n  @Suite struct NestedTests {\n    @Test func aTestRuns() {\n      #expect(true)\n    }\n  }\n}\n' > "$d/Tests/SwiftSymbolsTests/NestedTests.swift" ;;
     *) return 1 ;;
@@ -257,6 +402,10 @@ plant_third_violation() {
   case "$2" in
     check_core_import_boundary)
       printf 'import struct SwiftUI.Image\n' > "$d/Sources/SwiftSymbols/Leak.swift" ;;
+    check_generated_header)
+      printf '\n// Generated by swift-symbols-generate from SF Symbols 2026, macOS build 26A428. Do not edit.\n// Regenerate with `bash Scripts/generate-catalog.sh` after an Xcode or macOS update.\n' > "$d/Sources/SwiftSymbols/Generated/Late.swift" ;;
+    check_no_resources)
+      printf 'let names = Bundle.module.url(forResource: "symbols", withExtension: "tsv")\n' >> "$d/Sources/SwiftSymbols/Module.swift" ;;
     check_job_timeouts)
       printf 'name: Quoted\n\non:\n  push:\n\njobs:\n  "quoted":\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n' > "$d/.github/workflows/quoted.yml" ;;
     check_suite_time_limit)
@@ -268,6 +417,8 @@ plant_third_violation() {
 plant_fourth_violation() {
   local d="$1"
   case "$2" in
+    check_generated_header)
+      printf 'plus\t1\n' > "$d/Sources/SwiftSymbols/Generated/symbols.tsv" ;;
     check_core_import_boundary)
       printf 'import UIKit\n' >> "$d/Sources/SwiftSymbols/Module.swift" ;;
     check_suite_time_limit)
@@ -298,8 +449,12 @@ plant_violation() {
       printf 'A line \342\200\224 with an em dash\n' >> "$d/README.md" ;;
     check_force_ops)
       printf 'let x = y as! Int\n' >> "$d/Sources/SwiftSymbols/Module.swift" ;;
+    check_generated_header)
+      printf 'extension SFSymbol {}\n' > "$d/Sources/SwiftSymbols/Generated/Headerless.swift" ;;
     check_job_timeouts)
       printf 'name: Extra\n\non:\n  push:\n\njobs:\n  stray:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n' > "$d/.github/workflows/extra.yml" ;;
+    check_no_resources)
+      printf '  resources: [.copy("symbols.tsv")],\n' >> "$d/Package.swift" ;;
     check_suite_time_limit)
       printf 'import Testing\n\n@Suite struct UnboundedTests {\n  @Test func aTestRuns() {\n    #expect(true)\n  }\n}\n' > "$d/Tests/SwiftSymbolsTests/UnboundedTests.swift" ;;
     check_swift_testing_only)
@@ -320,8 +475,12 @@ remove_subject() {
   case "$2" in
     check_core_import_boundary)
       rm -rf "$d/Sources/SwiftSymbols" ;;
+    check_generated_header)
+      rm -rf "$d/Sources/SwiftSymbols/Generated" ;;
     check_job_timeouts)
       rm -rf "$d/.github" ;;
+    check_no_resources)
+      rm -f "$d/Package.swift" ;;
     check_suite_time_limit)
       printf 'import SwiftSymbols\nimport Testing\n\nstruct NotASuite {}\n' > "$d/Tests/SwiftSymbolsTests/ModuleTests.swift"
       printf 'import SwiftSymbolsUI\nimport Testing\n\nstruct NotASuite {}\n' > "$d/Tests/SwiftSymbolsUITests/ModuleTests.swift" ;;
@@ -336,6 +495,7 @@ run_all() {
   for check in "${SELF_TESTABLE[@]}"; do "$check"; done
   check_nothing_local_tracked
   check_format
+  check_catalog_fresh
 }
 
 self_test() {
@@ -395,6 +555,10 @@ self_test() {
   printf '%d self-test arms\n' "$arms"
 }
 
+# A check that could not verify what it names. It fails nothing, so a machine that cannot run a
+# check still gets a clean gate, but no reader mistakes the line for verification.
+warn() { printf '[WARN] %s\n' "$1"; }
+
 swift_files() {
   find "$ROOT/$1" -name '*.swift' -type f 2>/dev/null | sort
 }
@@ -407,10 +571,30 @@ write_clean_tree() {
   cat > "$d/Sources/SwiftSymbols/Module.swift" <<'EOF'
 import Foundation
 
-/// A symbol name. The doc comment may say Date(), unsafe, import SwiftUI, and DispatchQueue.
+/// A symbol name. The doc comment may say Date(), unsafe, import SwiftUI, Bundle.module, and DispatchQueue.
 public struct SymbolName: Sendable {
   public let rawValue: String
 }
+EOF
+  mkdir -p "$d/Sources/SwiftSymbols/Generated" "$d/Sources/SwiftSymbolsGenerator"
+  cat > "$d/Sources/SwiftSymbolsGenerator/Emitter.swift" <<'EOF'
+package struct Emitter {
+  package static let headerPrefix = "// Generated by swift-symbols-generate"
+
+  package var header: String {
+    """
+    \(Self.headerPrefix) from SF Symbols \(catalog.sfSymbolsYear), macOS build \(build). Do not edit.
+    // Regenerate with `bash Scripts/generate-catalog.sh` after an Xcode or macOS update.
+
+    """
+  }
+}
+EOF
+  cat > "$d/Sources/SwiftSymbols/Generated/SymbolTable.swift" <<'EOF'
+// Generated by swift-symbols-generate from SF Symbols 2026, macOS build 26A428. Do not edit.
+// Regenerate with `bash Scripts/generate-catalog.sh` after an Xcode or macOS update.
+
+enum SymbolTable {}
 EOF
   cat > "$d/Sources/SwiftSymbolsUI/Module.swift" <<'EOF'
 import SwiftSymbols

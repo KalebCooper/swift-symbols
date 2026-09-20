@@ -8,6 +8,12 @@ All notable changes are documented here. This project follows
 
 ### Added
 
+- `SFSymbol.all`, listing every catalogued symbol once, in the order Apple's SF Symbols app
+  shows them. The list is built on first use.
+- Availability on `SFSymbol`: `availability`, reporting the first release of each Apple platform
+  that draws the symbol, the `Availability` and `Version` types it answers with, and
+  `isAvailable`, which compares the running OS against the entry for the platform it is built
+  for. A name the catalog does not list has no availability and is reported available.
 - Variant resolution on `SFSymbol`: `base`, `variants`, `applying(_:)`, `resolving(_:)`,
   `hasVariant(_:)`, and the `circle`, `fill`, `rectangle`, `slash`, and `square` properties.
   Applying a combination the catalog does not draw falls back to the nearest name it does.

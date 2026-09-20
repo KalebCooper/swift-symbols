@@ -18,11 +18,6 @@ let package = Package(
   targets: [
     .target(
       name: "SwiftSymbols",
-      resources: [
-        .copy("Resources/aliases.tsv"),
-        .copy("Resources/categories.tsv"),
-        .copy("Resources/symbols.tsv"),
-      ],
       swiftSettings: swiftSettings
     ),
     .target(

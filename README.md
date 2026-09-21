@@ -85,6 +85,36 @@ Then add the product you need to a target:
 In Xcode, choose File > Add Package Dependencies and enter
 `https://github.com/KalebCooper/swift-symbols.git`.
 
+## Demo app
+
+`Demo/` holds SymbolBrowser, an iOS app that exercises the package on six screens:
+
+- The symbol catalog, every symbol in Apple's order, searchable by name.
+- Symbol detail: the name, its Swift spelling, variants, base, availability across five platforms,
+  `isAvailable`, and buttons to copy the name and the spelling.
+- A variant playground comparing `resolving(_:)`, `applying(_:)`, and SwiftUI's own
+  `symbolVariant(_:)`.
+- Symbol style: `SymbolStyle` and `symbolStyle(_:weight:scale:)` with a weight and a scale.
+- Labels and images: both `Label(_:symbol:)` overloads, `Image(_:)`, and `Image(_:variants:)`.
+- Availability: `catalogVersion`, `Availability.current`, `Version` comparison, and the symbols that
+  need a later iOS than 26.0.
+
+The app is never part of any product. It is not in the package graph, CI does not build it, and a
+consumer never builds or links it.
+
+The Xcode project is generated from `Demo/project.yml` with [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+and is not checked in. From a fresh clone:
+
+```sh
+brew install xcodegen
+cd Demo
+xcodegen generate
+open SymbolBrowser.xcodeproj
+```
+
+Choose the `SymbolBrowser` scheme and an iOS 26 simulator, then run. Regenerate after changing
+`project.yml` or adding a file under `Demo/Sources` or `Demo/Resources`.
+
 ## License
 
 MIT. See [LICENSE](LICENSE). This project is independent of Apple. SF Symbols are provided by Apple

@@ -32,9 +32,9 @@ Thanks for your interest. Contributions are welcome; every change to the public 
 - **Tests:** Swift Testing only. Every `@Suite` carries
   `.timeLimit(.minutes(suiteTimeLimitMinutes))`, so a test that stops making progress fails its
   suite instead of holding the run open.
-- **Style:** `swift format lint --strict --recursive Sources Tests` must report zero findings.
-  Declarations are ordered alphabetically within their groupings unless an inline comment says why
-  not.
+- **Style:** `swift format lint --strict --recursive Sources Tests Demo/Sources` must report zero
+  findings. Declarations are ordered alphabetically within their groupings unless an inline comment
+  says why not.
 - **Gate:** `Scripts/verify.sh` runs the format lint and every repository invariant the compiler
   cannot see. Run it before every commit; it must exit 0. `Scripts/verify.sh --self-test` proves
   each check still trips on a planted violation.
@@ -42,6 +42,10 @@ Thanks for your interest. Contributions are welcome; every change to the public 
   `bash Scripts/build-docs.sh <modules directory> <new output directory>`, which builds both
   products at zero warnings. The modules directory holds the `.swiftmodule` files of an iOS
   Simulator build.
+- **Demo app:** the `SymbolBrowser` scheme, generated from `Demo/project.yml` (see the README's
+  Demo app section), is the way to check a change by eye: how a symbol, a variant combination, a
+  style, or a label draws, and what the catalog reports for availability. Run it after a change to
+  `SwiftSymbolsUI` or to variant resolution.
 - **Scope:** no macros, no UIKit or AppKit bridge. Open an issue to discuss additions before
   investing in a large PR.
 

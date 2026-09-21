@@ -1,0 +1,43 @@
+name: SymbolBrowser
+options:
+  bundleIdPrefix: com.cooperlabs
+  deploymentTarget:
+    iOS: "26.0"
+  minimumXcodeGenVersion: "2.46.0"
+
+packages:
+  swift-symbols:
+    path: ..
+
+targets:
+  SymbolBrowser:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - Resources
+    # SwiftSymbolsUI does not re-export SwiftSymbols, so a screen that names a symbol and styles
+    # it needs both products.
+    dependencies:
+      - package: swift-symbols
+        product: SwiftSymbols
+      - package: swift-symbols
+        product: SwiftSymbolsUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cooperlabs.SymbolBrowser
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        # The app ships without an icon: the repository carries no symbol artwork, and an SF Symbol
+        # rendered to a PNG would put Apple's drawing in a public tree. XcodeGen supplies
+        # `AppIcon` for every application target unless the name is set explicitly, and the
+        # asset catalog compiler fails on a name no catalog contains, so the name is cleared
+        # rather than omitted.
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight

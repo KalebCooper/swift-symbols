@@ -33,6 +33,9 @@ let package = Package(
       dependencies: ["SwiftSymbolsGenerator"],
       swiftSettings: swiftSettings
     ),
+    // The runnable demo lives in Demo/ as a standalone Xcode app project, because SwiftPM cannot
+    // produce an iOS .app. It references this package as a local dependency and belongs to no
+    // product, so consumers never build or link it. Setup is in Demo/README.md.
     // The shared suite time limit stays out of every consumer product.
     .target(name: "SwiftSymbolsTestSupport", swiftSettings: swiftSettings),
     .testTarget(

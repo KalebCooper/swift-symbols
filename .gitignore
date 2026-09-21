@@ -2,6 +2,8 @@
 /.build
 /Packages
 /*.xcodeproj
+# Demo app project is generated from Demo/project.yml via XcodeGen, not checked in.
+/Demo/*.xcodeproj
 xcuserdata/
 *.xcuserstate
 DerivedData/

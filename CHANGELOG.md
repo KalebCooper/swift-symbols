@@ -6,6 +6,12 @@ All notable changes are documented here. This project follows
 
 ## Unreleased
 
+### Added
+
+- SymbolBrowser, a demo iOS app under `Demo/` that browses the catalog and exercises variants,
+  styling, labels, and availability. It is generated with XcodeGen, is not part of any product, and
+  consumers never build or link it.
+
 ## 0.1.0 - 2026-09-20
 
 ### Added

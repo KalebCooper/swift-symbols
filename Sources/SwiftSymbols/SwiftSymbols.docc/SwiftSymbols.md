@@ -39,9 +39,9 @@ This module imports no UI framework, so UIKit and AppKit code can use it without
 - <doc:WorkingWithVariants>
 - ``SFSymbol/Variant``
 
-### Availability
+### Releases and metadata
 
-- <doc:Availability>
+- <doc:SwiftSymbols/Availability>
 - ``SFSymbol/Availability``
 - ``SFSymbol/Version``
 - ``SFSymbol/CatalogVersion``

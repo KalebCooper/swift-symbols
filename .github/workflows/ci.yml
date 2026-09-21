@@ -14,9 +14,10 @@ jobs:
     name: Build & Test (iOS Simulator)
     runs-on: macos-26
     # Every job in this repository is bounded, so a hang fails the job instead of sitting for the
-    # six-hour default. The ceiling is meant to be that job's slowest green run on `main` under its
-    # current definition, rounded up to the next five minutes and then tripled. `Scripts/verify.sh`
-    # holds the rule that every job has one. No green run exists yet; revisit after the first.
+    # six-hour default. The ceiling is that job's slowest green run on `main` under its current
+    # definition, rounded up to the next five minutes and then tripled. `Scripts/verify.sh` holds
+    # the rule that every job has one. This lane's green runs are 2m59s and 2m24s, both inside five
+    # minutes, and five tripled is fifteen.
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -43,7 +44,8 @@ jobs:
     name: swift-format lint
     runs-on: ubuntu-latest
     container: swift:6.3-noble
-    # No green run exists yet; revisit after the first.
+    # Bounded on the same basis as the job above: no green run of this lane has reached five
+    # minutes, and five tripled is fifteen.
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -51,4 +53,4 @@ jobs:
         run: swift format --version
       # Any finding fails the job.
       - name: Lint
-        run: swift format lint --strict --recursive Sources Tests
+        run: swift format lint --strict --recursive Sources Tests Demo/Sources

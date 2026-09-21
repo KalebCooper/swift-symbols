@@ -21,9 +21,10 @@ jobs:
     name: Build DocC site
     runs-on: macos-26
     # Every job in this repository is bounded, so a hang fails the job instead of sitting for the
-    # six-hour default. The ceiling is meant to be that job's slowest green run on `main` under its
-    # current definition, rounded up to the next five minutes and then tripled. `Scripts/verify.sh`
-    # holds the rule that every job has one. No green run exists yet; revisit after the first.
+    # six-hour default. The ceiling is that job's slowest green run on `main` under its current
+    # definition, rounded up to the next five minutes and then tripled. `Scripts/verify.sh` holds
+    # the rule that every job has one. This workflow's green run is 2m20s, inside five minutes, and
+    # five tripled is fifteen.
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
